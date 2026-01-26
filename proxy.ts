@@ -9,7 +9,7 @@ import { IAuthData } from "./services/auth/types";
 import { DEFAULT_PUBLIC_PAGES } from "./constants";
 import { EAppQueryParamsKey, EAppRoutes } from "./enums";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Create response early so we can pass it to getSession
