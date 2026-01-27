@@ -35,11 +35,12 @@ export const useSocket = () => {
     socket.off("receive_message");
   };
 
-  const sendMessage = (senderId: string, receiverId: string, message: string) => {
+  const sendMessage = (senderId: string, receiverId: string, message: string, replyToMessageId?: string | null) => {
     socket?.emit("send_message", {
       sender_id: senderId,
       receiver_id: receiverId,
       message,
+       reply_to_message_id: replyToMessageId ?? null,
     });
   };
 
