@@ -4,6 +4,7 @@ import "./globals.css";
 import { ProgressBarProvider } from "@/provider/ProgressBarProvider";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/provider/ThemeProvider";
+import { ServiceWorkerRegisterProvider } from "@/provider/ServiceWorkerRegisterProvider";
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -17,7 +18,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "ConnectPay",
-  description: "Real-time communication platform with messaging and calling features.",
+  description:
+    "Real-time communication platform with messaging and calling features.",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -47,7 +50,10 @@ export default function RootLayout({
               },
             }}
           />
-          <ProgressBarProvider>{children}</ProgressBarProvider>
+          <ProgressBarProvider>
+            <ServiceWorkerRegisterProvider />
+            {children}
+          </ProgressBarProvider>
         </ThemeProvider>
       </body>
     </html>

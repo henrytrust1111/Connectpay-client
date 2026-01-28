@@ -14,6 +14,8 @@ import { useSocket } from "@/hooks/useSocket";
 import { getChats } from "@/services/messages";
 import { getUsers, IUser } from "@/services/user";
 import toast from "react-hot-toast";
+import { registerServiceWorker } from "@/utils/registerSW";
+import { subscribeToPush } from "@/utils/push";
 
 interface Message {
   id: string;
@@ -81,12 +83,7 @@ export default function MessagesPage() {
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedUser || !session?.user?.id) return;
 
-    sendMessage(
-      session.user.id,
-      selectedUser,
-      newMessage,
-      replyTo?.id ?? null
-    );
+    sendMessage(session.user.id, selectedUser, newMessage, replyTo?.id ?? null);
 
     setMessages((prev) => [
       ...prev,
@@ -174,10 +171,9 @@ export default function MessagesPage() {
                 messages.map((msg) => (
                   <div
                     key={msg.id}
-                   ref={(el) => {
-  messageRefs.current[msg.id] = el;
-}}
-
+                    ref={(el) => {
+                      messageRefs.current[msg.id] = el;
+                    }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       setReplyTo(msg);
@@ -212,9 +208,7 @@ export default function MessagesPage() {
             {/* REPLY PREVIEW */}
             {replyTo && (
               <div className="border-l-4 border-blue-500 bg-blue-50 p-2 mt-2 flex justify-between text-sm">
-                <span className="truncate">
-                  Replying to: {replyTo.message}
-                </span>
+                <span className="truncate">Replying to: {replyTo.message}</span>
                 <button
                   onClick={() => setReplyTo(null)}
                   className="text-red-500"
@@ -237,9 +231,24 @@ export default function MessagesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Button
+        onClick={async () => {
+          const permission = await Notification.requestPermission();
+          if (permission === "granted") {
+            await registerServiceWorker();
+            await subscribeToPush(session.token);
+            toast.success("Notifications enabled 🎉");
+          }
+        }}
+      >
+        Enable Notifications
+      </Button>
+
     </div>
   );
 }
+
 
 
 
