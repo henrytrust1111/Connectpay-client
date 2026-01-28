@@ -1,10 +1,19 @@
+"use client";
+
 import type { Metadata } from "next";
 import { Geist_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ProgressBarProvider } from "@/provider/ProgressBarProvider";
 import { Toaster } from "react-hot-toast";
 import { ThemeProvider } from "@/provider/ThemeProvider";
-import { ServiceWorkerRegisterProvider } from "@/provider/ServiceWorkerRegisterProvider";
+import dynamic from "next/dynamic";
+const ServiceWorkerRegisterProvider = dynamic(
+  () =>
+    import("@/provider/ServiceWorkerRegisterProvider").then(
+      (mod) => mod.ServiceWorkerRegisterProvider
+    ),
+  { ssr: false }
+);
 
 const dmSans = DM_Sans({
   variable: "--font-dm-sans",
@@ -16,12 +25,12 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "ConnectPay",
-  description:
-    "Real-time communication platform with messaging and calling features.",
-  manifest: "/manifest.json",
-};
+// export const metadata: Metadata = {
+//   title: "ConnectPay",
+//   description:
+//     "Real-time communication platform with messaging and calling features.",
+//   manifest: "/manifest.json",
+// };
 
 export default function RootLayout({
   children,
