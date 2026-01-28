@@ -1,3 +1,4 @@
+const baseURL = process.env.NEXT_PUBLIC_API_URL;
 export const subscribeToPush = async (token: string) => {
   const registration = await navigator.serviceWorker.ready;
 
@@ -6,7 +7,7 @@ export const subscribeToPush = async (token: string) => {
     applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   });
 
-  await fetch("/api/push/subscribe", {
+  await fetch(`${baseURL}/push/subscribe`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
