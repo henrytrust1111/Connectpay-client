@@ -181,16 +181,16 @@ export default function MessagesPage() {
                     onMouseDown={() => handlePressStart(msg)}
                     onMouseUp={handlePressEnd}
                     onMouseLeave={handlePressEnd}
-                    className={`p-2 rounded max-w-xs space-y-1 transition-all ${
+                    className={`p-2 rounded max-w-xs space-y-1 transition-all break-words ${
                       msg.sender_id === session?.user?.id
-                        ? "bg-blue-100 ml-auto"
-                        : "bg-gray-100 mr-auto"
+                        ? "bg-blue-100 text-black dark:bg-blue-900 dark:text-white ml-auto"
+                        : "bg-gray-100 text-black dark:bg-dark-background-100 dark:text-white mr-auto"
                     }`}
                   >
                     {msg.reply_id && (
                       <div
                         onClick={() => scrollToMessage(msg.reply_id)}
-                        className="border-l-4 border-blue-500 bg-white p-1 text-xs cursor-pointer"
+                        className="border-l-4 border-blue-500 bg-white dark:bg-dark-background-200 dark:border-blue-400 dark:text-white p-1 text-xs cursor-pointer"
                       >
                         {msg.reply_message}
                       </div>
@@ -207,7 +207,7 @@ export default function MessagesPage() {
 
             {/* REPLY PREVIEW */}
             {replyTo && (
-              <div className="border-l-4 border-blue-500 bg-blue-50 p-2 mt-2 flex justify-between text-sm">
+              <div className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400 dark:text-white p-2 mt-2 flex justify-between text-sm">
                 <span className="truncate">Replying to: {replyTo.message}</span>
                 <button
                   onClick={() => setReplyTo(null)}
