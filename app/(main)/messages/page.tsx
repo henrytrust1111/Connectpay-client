@@ -8,8 +8,12 @@ import {
 } from "@/components/common-elements/card";
 import { Button } from "@/components/common-elements/button";
 import { Input } from "@/components/common-elements/input";
+import dynamic from "next/dynamic";
 import { useState, useEffect, useRef } from "react";
 import { useSession } from "@/hooks";
+
+// Load emoji picker dynamically (no SSR)
+const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 import { useSocket } from "@/hooks/useSocket";
 import { getChats } from "@/services/messages";
 import { getUsers, IUser } from "@/services/user";
@@ -47,6 +51,30 @@ export default function MessagesPage() {
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   // When opening a chat, mark this so we can jump to bottom without visible scrolling
   const isInitialLoadRef = useRef(false);
+
+  // Emoji picker state and ref
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+
+  const handleEmojiClick = (emojiData: any) => {
+    // emojiData.emoji contains the character in current package versions
+    const char = (emojiData && (emojiData.emoji ?? emojiData.unified)) || "";
+    setNewMessage((prev) => prev + char);
+    setShowEmojiPicker(false);
+  };
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (!showEmojiPicker) return;
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showEmojiPicker]);
 
   /* ---------------- SOCKET ---------------- */
   useEffect(() => {
@@ -254,7 +282,23 @@ export default function MessagesPage() {
             )}
 
             {/* INPUT */}
-            <div className="flex gap-2 mt-2">
+            <div className="flex gap-2 mt-2 items-end relative">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowEmojiPicker((s) => !s)}
+                  className="text-2xl p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-background-200"
+                >
+                  😊
+                </button>
+
+                {showEmojiPicker && (
+                  <div ref={emojiPickerRef} className="absolute bottom-12 left-0 z-50">
+                    <EmojiPicker onEmojiClick={(e) => handleEmojiClick(e)} />
+                  </div>
+                )}
+              </div>
+
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
