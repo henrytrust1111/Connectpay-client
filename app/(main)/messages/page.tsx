@@ -43,6 +43,11 @@ export default function MessagesPage() {
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
+  // Reference to the scrollable chat container so we can scroll to bottom
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
+  // When opening a chat, mark this so we can jump to bottom without visible scrolling
+  const isInitialLoadRef = useRef(false);
+
   /* ---------------- SOCKET ---------------- */
   useEffect(() => {
     if (!isConnected || !session?.user?.id) return;
@@ -75,7 +80,11 @@ export default function MessagesPage() {
   const loadMessages = async (userId: string) => {
     setLoading(true);
     const res = await getChats(userId);
-    if (res.success) setMessages(res.data || []);
+    if (res.success) {
+      setMessages(res.data || []);
+      // mark as initial load so the effect will jump to bottom without visible scroll
+      isInitialLoadRef.current = true;
+    }
     setLoading(false);
   };
 
@@ -113,6 +122,29 @@ export default function MessagesPage() {
     el.classList.add("bg-yellow-200");
     setTimeout(() => el.classList.remove("bg-yellow-200"), 1200);
   };
+
+  /* ---------------- SCROLL TO BOTTOM ---------------- */
+  const scrollToBottom = (smooth = false) => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    const top = el.scrollHeight - el.clientHeight;
+    el.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
+  };
+
+  // Auto-scroll to bottom when messages change (new messages or after sending)
+  useEffect(() => {
+    if (!chatContainerRef.current) return;
+
+    if (isInitialLoadRef.current) {
+      // When opening a chat, jump to the bottom instantly (no visible scrolling)
+      scrollToBottom(false);
+      isInitialLoadRef.current = false;
+      return;
+    }
+
+    // For subsequent incoming/sent messages, smooth scroll
+    scrollToBottom(true);
+  }, [messages.length]);
 
   /* ---------------- LONG PRESS ---------------- */
   const handlePressStart = (msg: Message) => {
@@ -164,7 +196,10 @@ export default function MessagesPage() {
           </CardHeader>
 
           <CardContent>
-            <div className="h-72 overflow-y-auto border rounded p-4 space-y-2">
+            <div
+              ref={chatContainerRef}
+              className="h-72 overflow-y-auto border rounded p-4 space-y-2"
+            >
               {loading ? (
                 <p>Loading…</p>
               ) : (
