@@ -44,12 +44,48 @@ export const useSocket = () => {
     });
   };
 
+  // Emit an edit message request
+  const emitEditMessage = (message_id: string, editor_id: string, new_message: string) => {
+    socket?.emit("edit_message", { message_id, editor_id, new_message });
+  };
+
+  // Listen for message_edited events
+  const onMessageEdited = (callback: (updatedMessage: any) => void) => {
+    if (!socket) return;
+    socket.off("message_edited");
+    socket.on("message_edited", callback);
+  };
+
+  // Emit a delete message request
+  const emitDeleteMessage = (message_id: string, requester_id: string, type: "me" | "everyone") => {
+    socket?.emit("delete_message", { message_id, requester_id, type });
+  };
+
+  // Listen for message_deleted events
+  const onMessageDeleted = (callback: (data: any) => void) => {
+    if (!socket) return;
+    socket.off("message_deleted");
+    socket.on("message_deleted", callback);
+  };
+
+  // Listen for socket errors (emitted to the emitter)
+  const onSocketError = (callback: (err: any) => void) => {
+    if (!socket) return;
+    socket.off("error");
+    socket.on("error", callback);
+  };
+
   return {
     socket,
     isConnected,
     sendMessage,
     onReceiveMessage,
     offReceiveMessage,
+    emitEditMessage,
+    onMessageEdited,
+    emitDeleteMessage,
+    onMessageDeleted,
+    onSocketError,
   };
 };
 

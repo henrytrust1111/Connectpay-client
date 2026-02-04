@@ -15,9 +15,11 @@ import { useSession } from "@/hooks";
 // Load emoji picker dynamically (no SSR)
 const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 import { useSocket } from "@/hooks/useSocket";
-import { getChats } from "@/services/messages";
+import { getChats, editMessage, deleteMessage } from "@/services/messages";
 import { getUsers, IUser } from "@/services/user";
 import toast from "react-hot-toast";
+import { MessageActionsModal } from "@/components/modal/message-actions-modal";
+import { DeleteMessageModal } from "@/components/modal/delete-message-modal";
 import { registerServiceWorker } from "@/utils/registerSW";
 import { subscribeToPush } from "@/utils/push";
 
@@ -25,17 +27,29 @@ interface Message {
   id: string;
   sender_id: string;
   receiver_id: string;
-  message: string;
+  message: string | null;
   created_at: string;
   reply_id?: string | null;
   reply_message?: string | null;
   reply_sender_id?: string | null;
+  edited?: boolean;
+  is_deleted?: boolean;
 }
 
 export default function MessagesPage() {
   const { session } = useSession();
-  const { isConnected, sendMessage, onReceiveMessage, offReceiveMessage } =
-    useSocket();
+  const {
+    socket,
+    isConnected,
+    sendMessage,
+    onReceiveMessage,
+    offReceiveMessage,
+    emitEditMessage,
+    onMessageEdited,
+    emitDeleteMessage,
+    onMessageDeleted,
+    onSocketError,
+  } = useSocket();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
@@ -44,6 +58,17 @@ export default function MessagesPage() {
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // Action modal (reply/edit/delete)
+  const [actionModalOpen, setActionModalOpen] = useState(false);
+  const [actionModalMessage, setActionModalMessage] = useState<Message | null>(null);
+
+  // Delete confirmation modal
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  // Editing state (editing in input area)
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const longPressTimer = useRef<NodeJS.Timeout | null>(null);
 
@@ -51,6 +76,8 @@ export default function MessagesPage() {
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   // When opening a chat, mark this so we can jump to bottom without visible scrolling
   const isInitialLoadRef = useRef(false);
+
+
 
   // Emoji picker state and ref
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -97,6 +124,35 @@ export default function MessagesPage() {
     return () => offReceiveMessage();
   }, [isConnected, selectedUser]);
 
+  /* ---------------- SOCKET: edits & deletes ---------------- */
+  useEffect(() => {
+    if (!socket || !session?.user?.id) return;
+
+    onMessageEdited((updated: Message) => {
+      // Only update if message belongs to current conversation
+      if (updated.sender_id === selectedUser || updated.receiver_id === selectedUser) {
+        setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      }
+    });
+
+    onMessageDeleted((data: any) => {
+      // For everyone: update the message row (server returns message object)
+      if (data.forEveryone) {
+        const updated: Message = data.message || { id: data.id, sender_id: "", receiver_id: "", message: null, created_at: new Date().toISOString(), is_deleted: true } as Message;
+        setMessages((prev) => prev.map((m) => (m.id === data.id ? { ...m, ...updated } : m)));
+      } else {
+        // Deleted for me — only remove if it was deleted for current user
+        if (data.deletedFor === session.user.id) {
+          setMessages((prev) => prev.filter((m) => m.id !== data.id));
+        }
+      }
+    });
+
+    onSocketError((err: any) => {
+      toast.error(err?.message || "Socket error");
+    });
+  }, [socket, session?.user?.id, selectedUser]);
+
   /* ---------------- USERS ---------------- */
   useEffect(() => {
     getUsers().then((res) => {
@@ -117,8 +173,14 @@ export default function MessagesPage() {
   };
 
   /* ---------------- SEND MESSAGE ---------------- */
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedUser || !session?.user?.id) return;
+
+    // If editing, submit edit instead
+    if (editingMessageId) {
+      await submitEditById(editingMessageId);
+      return;
+    }
 
     sendMessage(session.user.id, selectedUser, newMessage, replyTo?.id ?? null);
 
@@ -138,6 +200,100 @@ export default function MessagesPage() {
 
     setNewMessage("");
     setReplyTo(null);
+  };
+
+  /* ---------------- EDIT & DELETE ---------------- */
+  const startEdit = (msg: Message) => {
+    // Put message text in the input area (WhatsApp-like)
+    setEditingMessageId(msg.id);
+    setNewMessage(msg.message ?? "");
+    // Focus input
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const cancelEdit = () => {
+    setEditingMessageId(null);
+    setNewMessage("");
+  };
+
+  const submitEditById = async (id: string) => {
+    const msg = messages.find((m) => m.id === id);
+    if (!msg || !editingMessageId) return cancelEdit();
+    if (!newMessage.trim() || !session?.user?.id) return cancelEdit();
+
+    const oldText = msg.message;
+    // Optimistic update
+    setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, message: newMessage, edited: true } : m)));
+    cancelEdit();
+
+    try {
+      if (isConnected && socket) {
+        const onEdited = (updated: Message) => {
+          if (updated.id === id) {
+            setMessages((prev) => prev.map((m) => (m.id === id ? updated : m)));
+            socket.off("message_edited", onEdited);
+            socket.off("error", onError);
+          }
+        };
+
+        const onError = (err: any) => {
+          if (err?.message) toast.error(err.message);
+          // Revert
+          setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, message: oldText, edited: false } : m)));
+          socket.off("message_edited", onEdited);
+          socket.off("error", onError);
+        };
+
+        socket.once("message_edited", onEdited);
+        socket.once("error", onError);
+        emitEditMessage(id, session.user.id, newMessage);
+      } else {
+        const res = await editMessage(id, newMessage);
+        if (!res.success) throw new Error(res.message || "Failed to edit message");
+        setMessages((prev) => prev.map((m) => (m.id === id ? res.data : m)));
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to edit message");
+      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, message: oldText, edited: false } : m)));
+    }
+  };
+
+  const handleDelete = async (msg: Message, type: "me" | "everyone") => {
+    if (type === "everyone") {
+      if (!confirm("Delete this message for everyone?")) return;
+    }
+
+    const messageId = msg.id;
+
+    try {
+      if (isConnected && socket) {
+        // Optimistic: remove locally for 'me', replace for everyone
+        if (type === "me") setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        else setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, message: null, is_deleted: true } : m)));
+
+        // set up temporary error handler to revert if server rejects
+        const onErr = (err: any) => {
+          toast.error(err?.message || "Failed to delete message");
+          // Reload messages (fallback) or ideally revert; simple approach: reload chat
+          if (selectedUser) loadMessages(selectedUser);
+          socket.off("error", onErr);
+        };
+
+        socket.once("error", onErr);
+        emitDeleteMessage(messageId, session.user.id, type);
+      } else {
+        const res = await deleteMessage(messageId, type);
+        if (!res.success) throw new Error(res.message || "Failed to delete");
+        if (res.data.forEveryone) {
+          const updated = res.data.message || { id: messageId, message: null, is_deleted: true };
+          setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, ...updated } : m)));
+        } else {
+          setMessages((prev) => prev.filter((m) => m.id !== messageId));
+        }
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to delete message");
+    }
   };
 
   /* ---------------- SCROLL TO ORIGINAL ---------------- */
@@ -174,15 +330,71 @@ export default function MessagesPage() {
     scrollToBottom(true);
   }, [messages.length]);
 
-  /* ---------------- LONG PRESS ---------------- */
+  /* ---------------- LONG PRESS, CLICK (desktop) & SWIPE (mobile) ---------------- */
+  // Swipe refs and thresholds
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+  const swipedRef = useRef(false);
+  const SWIPE_THRESHOLD = 60; // px to the right
+  const SWIPE_MAX_VERTICAL = 30; // allow small Y drift
+
+  // Desktop click should open actions modal immediately (pointer: fine)
+  const handleClick = (msg: Message) => {
+    if (typeof window === "undefined") return;
+    try {
+      if (window.matchMedia && window.matchMedia("(pointer: fine)").matches) {
+        setActionModalMessage(msg);
+        setActionModalOpen(true);
+      }
+    } catch (e) {
+      // fallback: do nothing
+    }
+  };
+
   const handlePressStart = (msg: Message) => {
+    // Start long-press timer (works for mouse+touch)
     longPressTimer.current = setTimeout(() => {
-      setReplyTo(msg);
+      setActionModalMessage(msg);
+      setActionModalOpen(true);
     }, 500);
   };
 
   const handlePressEnd = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current);
+  };
+
+  // Touch handlers to detect right-swipe to reply
+  const onTouchStartHandler = (msg: Message, e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStartXRef.current = t.clientX;
+    touchStartYRef.current = t.clientY;
+    swipedRef.current = false;
+    // also start long-press behavior
+    handlePressStart(msg);
+  };
+
+  const onTouchMoveHandler = (msg: Message, e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartXRef.current;
+    const dy = t.clientY - (touchStartYRef.current ?? 0);
+
+    // Detect right swipe
+    if (dx > SWIPE_THRESHOLD && Math.abs(dy) < SWIPE_MAX_VERTICAL && !swipedRef.current) {
+      swipedRef.current = true;
+      // Cancel long press
+      handlePressEnd();
+      // Trigger reply behavior
+      setReplyTo(msg);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  };
+
+  const onTouchEndHandler = () => {
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+    swipedRef.current = false;
+    handlePressEnd();
   };
 
   return (
@@ -239,11 +451,16 @@ export default function MessagesPage() {
                     }}
                     onContextMenu={(e) => {
                       e.preventDefault();
-                      setReplyTo(msg);
+                      setActionModalMessage(msg);
+                      setActionModalOpen(true);
                     }}
+                    onClick={() => handleClick(msg)}
                     onMouseDown={() => handlePressStart(msg)}
                     onMouseUp={handlePressEnd}
                     onMouseLeave={handlePressEnd}
+                    onTouchStart={(e) => onTouchStartHandler(msg, e)}
+                    onTouchMove={(e) => onTouchMoveHandler(msg, e)}
+                    onTouchEnd={onTouchEndHandler}
                     className={`p-2 rounded max-w-xs space-y-1 transition-all break-words ${
                       msg.sender_id === session?.user?.id
                         ? "bg-blue-100 text-black dark:bg-blue-900 dark:text-white ml-auto"
@@ -259,7 +476,29 @@ export default function MessagesPage() {
                       </div>
                     )}
 
-                    <p>{msg.message}</p>
+                    {/* Message body / deleted placeholder */}
+                    {msg.is_deleted ? (
+                      <p className="italic text-muted-foreground">Message deleted</p>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2">
+                          <p>{msg.message}</p>
+                          {msg.edited && (
+                            <span className="text-[10px] text-muted-foreground">(edited)</span>
+                          )}
+                        </div>
+
+                        {/* Actions (only sender) */}
+                        {msg.sender_id === session?.user?.id && !msg.is_deleted && (
+                          <div className="flex gap-2 mt-1">
+                            <button className="text-xs text-blue-600" onClick={() => { startEdit(msg); }}>Edit</button>
+                            <button className="text-xs text-red-600" onClick={() => { setActionModalMessage(msg); setDeleteModalOpen(true); }}>Delete</button>
+                            <button className="text-xs text-gray-600" onClick={() => { setActionModalMessage(msg); setActionModalOpen(true); }}>More</button>
+                          </div>
+                        )}
+                      </>
+                    )}
+
                     <p className="text-xs text-muted-foreground">
                       {new Date(msg.created_at).toLocaleTimeString()}
                     </p>
@@ -278,6 +517,16 @@ export default function MessagesPage() {
                 >
                   ✕
                 </button>
+              </div>
+            )}
+
+            {/* EDITING PREVIEW (in input area) */}
+            {editingMessageId && (
+              <div className="border-l-4 border-green-500 bg-green-50 dark:bg-dark-background-200 dark:border-green-400 dark:text-white p-2 mt-2 flex justify-between text-sm items-center">
+                <span className="truncate">Editing message</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { cancelEdit(); }} className="text-sm text-red-500">Cancel</button>
+                </div>
               </div>
             )}
 
@@ -300,12 +549,13 @@ export default function MessagesPage() {
               </div>
 
               <Input
+                ref={inputRef}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Type a message…"
                 onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               />
-              <Button onClick={handleSendMessage}>Send</Button>
+              <Button onClick={handleSendMessage}>{editingMessageId ? "Save" : "Send"}</Button>
             </div>
           </CardContent>
         </Card>
@@ -323,6 +573,39 @@ export default function MessagesPage() {
       >
         Enable Notifications
       </Button>
+
+      {/* Message actions modal */}
+      <MessageActionsModal
+        isOpen={actionModalOpen}
+        onClose={() => setActionModalOpen(false)}
+        messageText={actionModalMessage?.message}
+        onReply={() => {
+          if (actionModalMessage) {
+            setReplyTo(actionModalMessage);
+            // Focus the input so user can start typing immediately
+            setTimeout(() => inputRef.current?.focus(), 50);
+          }
+        }}
+        onEdit={() => {
+          if (actionModalMessage) startEdit(actionModalMessage);
+        }}
+        onDelete={() => {
+          setDeleteModalOpen(true);
+        }}
+      />
+
+      <DeleteMessageModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onDeleteForMe={() => {
+          if (actionModalMessage) handleDelete(actionModalMessage, "me");
+          setDeleteModalOpen(false);
+        }}
+        onDeleteForEveryone={() => {
+          if (actionModalMessage) handleDelete(actionModalMessage, "everyone");
+          setDeleteModalOpen(false);
+        }}
+      />
 
     </div>
   );
