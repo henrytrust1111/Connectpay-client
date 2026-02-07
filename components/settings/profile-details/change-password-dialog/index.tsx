@@ -25,7 +25,7 @@ import {
   type ChangePasswordSchemaType,
 } from "@/validations/settings";
 import { changePassword } from "@/services/user";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Eye, EyeOff, X } from "lucide-react";
 import { RiEyeLine, RiEyeOffLine } from "react-icons/ri";
 

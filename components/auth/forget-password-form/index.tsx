@@ -18,7 +18,7 @@ import { Input } from "@/components/common-elements/input";
 import { Button } from "@/components/common-elements/button";
 import Link from "next/link";
 import { UserForgotPassword } from "@/services/auth";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";

@@ -17,7 +17,7 @@ const EmojiPicker = dynamic(() => import("emoji-picker-react"), { ssr: false });
 import { useSocket } from "@/hooks/useSocket";
 import { getChats, editMessage, deleteMessage } from "@/services/messages";
 import { getUsers, IUser } from "@/services/user";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { MessageActionsModal } from "@/components/modal/message-actions-modal";
 import { DeleteMessageModal } from "@/components/modal/delete-message-modal";
 import { registerServiceWorker } from "@/utils/registerSW";
@@ -606,14 +606,9 @@ export default function MessagesPage() {
           setDeleteModalOpen(false);
         }}
       />
-
     </div>
   );
 }
-
-
-
-
 
 
 
@@ -642,7 +637,7 @@ export default function MessagesPage() {
 // import { useSocket } from "@/hooks/useSocket";
 // import { getChats } from "@/services/messages";
 // import { getUsers, IUser } from "@/services/user";
-// import toast from "react-hot-toast";
+// import { toast } from "sonner";
 
 // interface Message {
 //   id: string;

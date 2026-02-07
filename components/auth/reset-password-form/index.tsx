@@ -20,7 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { UserResetPassword } from "@/services/auth";
 import { useState, useEffect, Suspense } from "react";
 import { Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { RiEyeLine, RiEyeOffLine } from "react-icons/ri";
 
 export function ResetPasswordFormContent() {

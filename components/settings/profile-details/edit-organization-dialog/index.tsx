@@ -26,7 +26,7 @@ import {
 } from "@/validations/settings";
 import { updateOrganization } from "@/services/user";
 import { useSession } from "@/hooks/useSession";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface EditOrganizationDialogProps {
   isOpen: boolean;

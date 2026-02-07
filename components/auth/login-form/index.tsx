@@ -24,7 +24,7 @@ import { jwtDecode } from "jwt-decode";
 import { useSession } from "@/hooks";
 import AuthLogo from "../auth-logo";
 import { Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function LoginForm() {
   const { setSession } = useSession();
@@ -54,8 +54,6 @@ export function LoginForm() {
         await setSession({ token, user, expires });
 
         toast.success("Login successful!");
-        console.log("testing login again!!!")
-        console.log(user)
 
         // Redirect after successful login
         const params = new URLSearchParams(window.location.search);
@@ -116,6 +114,8 @@ export function LoginForm() {
                       <FormControl>
                         <Input
                           placeholder="admin@example.com"
+                          type="email"
+                          aria-label="Email address"
                           {...field}
                           disabled={loading}
                           className={`h-[50px] rounded-[8px] ${
@@ -123,6 +123,7 @@ export function LoginForm() {
                           }`}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1.5">We'll never share your email address</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -140,6 +141,7 @@ export function LoginForm() {
                           <Input
                             type={showPassword ? "text" : "password"}
                             placeholder="••••••••"
+                            aria-label="Password"
                             {...field}
                             disabled={loading}
                             className={`h-[50px] rounded-[8px] ${
@@ -148,19 +150,17 @@ export function LoginForm() {
                           />
                         </FormControl>
 
-                        {showPassword ? (
-                          <RiEyeOffLine
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
-                            onClick={() => setShowPassword(false)}
-                          />
-                        ) : (
-                          <RiEyeLine
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 cursor-pointer"
-                            onClick={() => setShowPassword(true)}
-                          />
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary rounded p-1 transition-colors"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          tabIndex={0}
+                        >
+                          {showPassword ? <RiEyeOffLine /> : <RiEyeLine />}
+                        </button>
                       </div>
-
+                      <p className="text-xs text-muted-foreground mt-1.5">Use a strong password with letters, numbers, and symbols</p>
                       <FormMessage />
                     </FormItem>
                   )}

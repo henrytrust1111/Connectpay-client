@@ -22,7 +22,7 @@ import { useRouter } from "next/navigation";
 import { EAppRoutes } from "@/enums";
 import AuthLogo from "../auth-logo";
 import { Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function InvitationForm() {
   const router = useRouter();

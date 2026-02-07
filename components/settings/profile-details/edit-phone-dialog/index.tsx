@@ -23,7 +23,7 @@ import {
 import { phoneSchema, type PhoneSchemaType } from "@/validations/settings";
 import { updateOrganization } from "@/services/user";
 import { useSession } from "@/hooks/useSession";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 interface EditPhoneDialogProps {
   isOpen: boolean;

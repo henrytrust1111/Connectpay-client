@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { Geist_Mono, DM_Sans } from "next/font/google";
 import "./globals.css";
 import { ProgressBarProvider } from "@/provider/ProgressBarProvider";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/common-elements/sonner";
 import { ThemeProvider } from "@/provider/ThemeProvider";
 import dynamic from "next/dynamic";
 const ServiceWorkerRegisterProvider = dynamic(
@@ -42,23 +42,8 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${geistMono.variable} font-sans antialiased`}
       >
-        <ThemeProvider attribute="class" disableTransitionOnChange>
-          <Toaster
-            position="top-right"
-            toastOptions={{
-              duration: 3000,
-              style: {
-                background: "#666AEE",
-                color: "#fff",
-              },
-              success: {
-                duration: 2000,
-              },
-              error: {
-                duration: 3000,
-              },
-            }}
-          />
+        <ThemeProvider attribute="class" disableTransitionOnChange defaultTheme="system" enableSystem>
+          <Toaster position="top-right" richColors closeButton />
           <ProgressBarProvider>
             <ServiceWorkerRegisterProvider />
             {children}

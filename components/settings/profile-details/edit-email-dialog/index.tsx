@@ -22,7 +22,7 @@ import {
 } from "@/components/common-elements/form";
 import { emailSchema, type EmailSchemaType } from "@/validations/settings";
 import { updateOrganization } from "@/services/user";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { useSession } from "@/hooks";
 import { deleteCookie } from "cookies-next";
 import { defaultAuth } from "@/constants";

@@ -1,4 +1,4 @@
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export const copyToClipboard = (text: string, label: string) => {
   navigator?.clipboard.writeText(text);

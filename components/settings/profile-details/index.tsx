@@ -18,7 +18,7 @@ import {
   updateOrganizationImage,
   deleteOrganizationImage,
 } from "@/services/user";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function ProfileDetails() {
   const { session, setSession } = useSession();

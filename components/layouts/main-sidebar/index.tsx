@@ -121,6 +121,7 @@ export const MainSidebar = () => {
           variant="ghost"
           className=" space-x-2 w-full justify-start p-4 text-secondary dark:hover:bg-[#111928] h-auto"
           size="lg"
+          aria-label="Sign out of your account"
         >
           <LogOut className="!h-6 !w-6 [&_*]:stroke-[2]" /> Logout
         </Button>

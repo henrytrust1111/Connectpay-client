@@ -21,9 +21,10 @@ import { EAppRoutes } from "@/enums";
 import AuthLogo from "../auth-logo";
 import { authUserSignup } from "@/services/auth";
 import { Loader2 } from "lucide-react";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { jwtDecode } from "jwt-decode";
 import { useSession } from "@/hooks";
+import { PasswordStrengthIndicator } from "@/components/common/password-strength-indicator";
 
 export function SignUpForm() {
   const router = useRouter();
@@ -105,7 +106,7 @@ export function SignUpForm() {
           </div>
 
           {/* Form Container */}
-          <div className="w-full border border-gray-200 dark:border-dark-border rounded-[10px] mt-5 p-5 sm:p-6 md:p-5 mb-10 bg-[#FAFAFA] dark:bg-dark-background-100">
+          <div className="w-full border border-gray-200 dark:border-dark-border rounded-[10px] mt-5 p-5 sm:p-6 md:p-5 mb-10 bg-white dark:bg-dark-background-100">
             <Form {...form}>
               <form
                 onSubmit={form.handleSubmit(onSubmit)}
@@ -123,12 +124,14 @@ export function SignUpForm() {
                       <FormControl>
                         <Input
                           placeholder="John Doe"
+                          aria-label="Full name"
                           {...field}
                           className={`h-[50px] rounded-[8px] ${
                             fieldState.error ? "border-red-500" : ""
                           }`}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">Your full name as you would like it displayed</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -146,12 +149,15 @@ export function SignUpForm() {
                       <FormControl>
                         <Input
                           placeholder="john@example.com"
+                          type="email"
+                          aria-label="Email address"
                           {...field}
                           className={`h-[50px] rounded-[8px] ${
                             fieldState.error ? "border-red-500" : ""
                           }`}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">We will use this to sign you in to your account</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -168,13 +174,16 @@ export function SignUpForm() {
                       </FormDescription>
                       <FormControl>
                         <Input
-                          placeholder="+1234567890"
+                          placeholder="+1234567890 or (123) 456-7890"
+                          type="tel"
+                          aria-label="Phone number"
                           {...field}
                           className={`h-[50px] rounded-[8px] ${
                             fieldState.error ? "border-red-500" : ""
                           }`}
                         />
                       </FormControl>
+                      <p className="text-xs text-muted-foreground mt-1">Include your country code for international numbers</p>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -203,11 +212,13 @@ export function SignUpForm() {
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                            aria-label={showPassword ? "Hide password" : "Show password"}
                           >
                             {showPassword ? <RiEyeOffLine /> : <RiEyeLine />}
                           </button>
                         </div>
                       </FormControl>
+                      <PasswordStrengthIndicator password={field.value} />
                       <FormMessage />
                     </FormItem>
                   )}

@@ -8,7 +8,7 @@ import { AddDomainDialog } from "./add-domain-dialog";
 import { ConfirmModal } from "@/components/modal/confirm-modal";
 import { useDomains } from "@/hooks/useDomain";
 import { DomainObject } from "@/services/assessment/types";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 
 export function DomainsTab() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -209,15 +209,6 @@ export function DomainsTab() {
               </p>
             </div>
             <div className="flex gap-2">
-              {/* <Button
-                variant="outline"
-                size="sm"
-                className="h-10 flex-1 dark:bg-[linear-gradient(0deg,#374151,#374151),linear-gradient(180deg,rgba(55,65,81,0.16)_0%,rgba(55,65,81,0)_100%)]"
-                onClick={() => setEditingDomain(domain)}
-                disabled={operationLoading}
-              >
-                <PencilLine className="size-4 dark:text-dark-text" />
-              </Button> */}
               <Button
                 variant="outline"
                 size="sm"
@@ -227,6 +218,7 @@ export function DomainsTab() {
                   setIsConfirmOpen(true);
                 }}
                 disabled={operationLoading}
+                aria-label={`Delete domain ${domain.title}`}
               >
                 <Trash2 className="size-4 dark:text-[#811B1F]" />
               </Button>
@@ -240,6 +232,8 @@ export function DomainsTab() {
             onClick={() => setIsAddDialogOpen(true)}
             className="h-[150px] border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center gap-2 hover:border-primary hover:bg-primary/5 transition-colors min-h-[160px] disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={operationLoading}
+            aria-label="Add new domain"
+            title="Add a new domain to your account"
           >
             <Plus className="size-8 text-muted-foreground" />
             <span className="text-sm font-medium text-muted-foreground">
