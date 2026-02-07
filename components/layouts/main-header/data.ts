@@ -8,5 +8,9 @@ export const getTitleAndDetails = (pathname: string) => {
     title = "Settings";
     details = "";
   }
+  if (pathname.startsWith(EAppRoutes.MESSAGES)) {
+    title = "Message";
+    details = "You can chat with friends whom are on the platform";
+  }
   return { title, details };
 };

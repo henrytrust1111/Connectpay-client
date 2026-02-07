@@ -12,6 +12,9 @@ import {
 import { Button } from "@/components/common-elements/button";
 import { useSession } from "@/hooks";
 import { getAvatarInitials, tailwindCn } from "@/helpers";
+import { registerServiceWorker } from "@/utils/registerSW";
+import { subscribeToPush } from "@/utils/push";
+import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import dynamic from "next/dynamic";
 const LogoImage = dynamic(
@@ -76,8 +79,29 @@ export const MainHeader = () => {
               />
             </Button>
           </div>
-          <div className=" hidden md:block">
-            <ThemeSwitcher
+          <div className=" hidden md:flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="default"
+              className="hidden md:inline-flex"
+              onClick={async () => {
+                try {
+                  const permission = await Notification.requestPermission();
+                  if (permission === "granted") {
+                    await registerServiceWorker();
+                    await subscribeToPush(session.token);
+                    toast.success("Notifications enabled 🎉");
+                  } else if (permission === "denied") {
+                    toast.error("Notifications denied");
+                  }
+                } catch (err: any) {
+                  toast.error(err?.message || "Failed to enable notifications");
+                }
+              }}
+            >
+              Enable Notifications
+            </Button>
+              <ThemeSwitcher
               mode={theme as TMode}
               handleChange={(mode) => setTheme(mode)}
             />
@@ -108,6 +132,29 @@ export const MainHeader = () => {
                 handleChange={(mode) => setTheme(mode)}
                 view="button"
               />
+            </div>
+            <div>
+              <Button
+                variant="outline"
+                size="default"
+                className="w-full border-body text-body h-16"
+                onClick={async () => {
+                  try {
+                    const permission = await Notification.requestPermission();
+                    if (permission === "granted") {
+                      await registerServiceWorker();
+                      await subscribeToPush(session.token);
+                      toast.success("Notifications enabled 🎉");
+                    } else if (permission === "denied") {
+                      toast.error("Notifications denied");
+                    }
+                  } catch (err: any) {
+                    toast.error(err?.message || "Failed to enable notifications");
+                  }
+                }}
+              >
+                Enable Notifications
+              </Button>
             </div>
             <div>
               <Button

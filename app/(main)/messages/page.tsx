@@ -20,8 +20,6 @@ import { getUsers, IUser } from "@/services/user";
 import { toast } from "sonner";
 import { MessageActionsModal } from "@/components/modal/message-actions-modal";
 import { DeleteMessageModal } from "@/components/modal/delete-message-modal";
-import { registerServiceWorker } from "@/utils/registerSW";
-import { subscribeToPush } from "@/utils/push";
 
 interface Message {
   id: string;
@@ -426,13 +424,11 @@ export default function MessagesPage() {
 
   return (
     <div className="space-y-6 pb-24">
-      <h1 className="text-3xl font-bold">Messages</h1>
-
       {/* RESPONSIVE WHATSAPP-STYLE LAYOUT */}
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-3 gap-6 px-6">
         
         {/* CONTACTS SIDEBAR - Hidden on mobile when viewing message, shown on desktop */}
-        <div className={`${viewingMessage ? "hidden" : "block"} md:block md:col-span-1`}>
+        <div className={`${viewingMessage ? "hidden" : "block"} md:block md:col-span-1 h-[72vh]`}>
           <Card className="flex flex-col h-full">
             <CardHeader>
               <CardTitle>Contacts</CardTitle>
@@ -459,7 +455,7 @@ export default function MessagesPage() {
         </div>
 
         {/* MESSAGE WINDOW - Shown on mobile when viewing message, always shown on desktop */}
-        <div className={`${viewingMessage ? "block" : "hidden"} md:block md:col-span-2`}>
+        <div className={`${viewingMessage ? "block" : "hidden"} md:block md:col-span-2 h-[72vh]`}>
           <Card className="flex flex-col h-full">
             <CardHeader className="flex flex-row items-center gap-4 pb-3">
               {/* Back button - only visible on mobile */}
@@ -490,6 +486,15 @@ export default function MessagesPage() {
               >
                 {loading ? (
                   <p>Loading…</p>
+                     ) : !selectedUser ? (
+                  <p className="text-muted-foreground">Select a contact to start chatting</p>
+                ) : messages.length === 0 ? (
+                  <div className="h-full flex items-center justify-center">
+                    <div className="text-center text-muted-foreground">
+                      <p className="font-semibold">No messages yet</p>
+                      <p className="text-sm">Say hi 👋</p>
+                    </div>
+                  </div>
                 ) : (
                   messages.map((msg) => (
                     <div
@@ -610,18 +615,7 @@ export default function MessagesPage() {
         </div>
       </div>
 
-      <Button
-        onClick={async () => {
-          const permission = await Notification.requestPermission();
-          if (permission === "granted") {
-            await registerServiceWorker();
-            await subscribeToPush(session.token);
-            toast.success("Notifications enabled 🎉");
-          }
-        }}
-      >
-        Enable Notifications
-      </Button>
+      {/* Notifications moved to main header */}
 
       {/* Message actions modal */}
       <MessageActionsModal
