@@ -58,6 +58,9 @@ export default function MessagesPage() {
   const [users, setUsers] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // WhatsApp-style mobile navigation: on mobile, show either contacts OR message window
+  const [viewingMessage, setViewingMessage] = useState(false);
+
   // Action modal (reply/edit/delete)
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionModalMessage, setActionModalMessage] = useState<Message | null>(null);
@@ -82,6 +85,19 @@ export default function MessagesPage() {
   // Emoji picker state and ref
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+
+  // Handle responsive behavior - reset viewing state on desktop
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window !== "undefined" && window.innerWidth >= 768) {
+        // On desktop, show both columns
+        setViewingMessage(false);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const handleEmojiClick = (emojiData: any) => {
     // emojiData.emoji contains the character in current package versions
@@ -259,8 +275,9 @@ export default function MessagesPage() {
   };
 
   const handleDelete = async (msg: Message, type: "me" | "everyone") => {
-    if (type === "everyone") {
-      if (!confirm("Delete this message for everyone?")) return;
+    if (!msg || !msg.id) {
+      toast.error("Message ID not found");
+      return;
     }
 
     const messageId = msg.id;
@@ -271,16 +288,22 @@ export default function MessagesPage() {
         if (type === "me") setMessages((prev) => prev.filter((m) => m.id !== messageId));
         else setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, message: null, is_deleted: true } : m)));
 
-        // set up temporary error handler to revert if server rejects
+        // set up temporary success and error handlers
         const onErr = (err: any) => {
           toast.error(err?.message || "Failed to delete message");
-          // Reload messages (fallback) or ideally revert; simple approach: reload chat
+          // Reload messages to revert optimistic update
           if (selectedUser) loadMessages(selectedUser);
           socket.off("error", onErr);
         };
 
         socket.once("error", onErr);
         emitDeleteMessage(messageId, session.user.id, type);
+        // Close modals after emitting deletion
+        setTimeout(() => {
+          setActionModalOpen(false);
+          setDeleteModalOpen(false);
+        }, 300);
+        toast.success("Message deleted");
       } else {
         const res = await deleteMessage(messageId, type);
         if (!res.success) throw new Error(res.message || "Failed to delete");
@@ -290,6 +313,10 @@ export default function MessagesPage() {
         } else {
           setMessages((prev) => prev.filter((m) => m.id !== messageId));
         }
+        // Close modals after successful deletion
+        setActionModalOpen(false);
+        setDeleteModalOpen(false);
+        toast.success("Message deleted");
       }
     } catch (err: any) {
       toast.error(err?.message || "Failed to delete message");
@@ -401,164 +428,186 @@ export default function MessagesPage() {
     <div className="space-y-6 pb-24">
       <h1 className="text-3xl font-bold">Messages</h1>
 
+      {/* RESPONSIVE WHATSAPP-STYLE LAYOUT */}
       <div className="grid md:grid-cols-3 gap-6">
-        {/* CONTACTS */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Contacts</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {users.map((u) => (
-              <Button
-                key={u.id}
-                className="w-full justify-start"
-                variant={selectedUser === u.id ? "default" : "outline"}
-                onClick={() => {
-                  setSelectedUser(u.id);
-                  setMessages([]);
-                  loadMessages(u.id);
-                }}
-              >
-                {u.name}
-              </Button>
-            ))}
-          </CardContent>
-        </Card>
+        
+        {/* CONTACTS SIDEBAR - Hidden on mobile when viewing message, shown on desktop */}
+        <div className={`${viewingMessage ? "hidden" : "block"} md:block md:col-span-1`}>
+          <Card className="flex flex-col h-full">
+            <CardHeader>
+              <CardTitle>Contacts</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 overflow-y-auto flex-1">
+              {users.map((u) => (
+                <Button
+                  key={u.id}
+                  className="w-full justify-start"
+                  variant={selectedUser === u.id ? "default" : "outline"}
+                  onClick={() => {
+                    setSelectedUser(u.id);
+                    setMessages([]);
+                    loadMessages(u.id);
+                    // On mobile, navigate to message window
+                    setViewingMessage(true);
+                  }}
+                >
+                  {u.name}
+                </Button>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* CHAT */}
-        <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle>
-              {selectedUser
-                ? `Chat with ${users.find((u) => u.id === selectedUser)?.name}`
-                : "Select a user"}
-            </CardTitle>
-          </CardHeader>
-
-          <CardContent>
-            <div
-              ref={chatContainerRef}
-              className="h-72 overflow-y-auto border rounded p-4 space-y-2"
-            >
-              {loading ? (
-                <p>Loading…</p>
-              ) : (
-                messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    ref={(el) => {
-                      messageRefs.current[msg.id] = el;
-                    }}
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      setActionModalMessage(msg);
-                      setActionModalOpen(true);
-                    }}
-                    onClick={() => handleClick(msg)}
-                    onMouseDown={() => handlePressStart(msg)}
-                    onMouseUp={handlePressEnd}
-                    onMouseLeave={handlePressEnd}
-                    onTouchStart={(e) => onTouchStartHandler(msg, e)}
-                    onTouchMove={(e) => onTouchMoveHandler(msg, e)}
-                    onTouchEnd={onTouchEndHandler}
-                    className={`p-2 rounded max-w-xs space-y-1 transition-all break-words ${
-                      msg.sender_id === session?.user?.id
-                        ? "bg-blue-100 text-black dark:bg-blue-900 dark:text-white ml-auto"
-                        : "bg-gray-100 text-black dark:bg-dark-background-100 dark:text-white mr-auto"
-                    }`}
-                  >
-                    {msg.reply_id && (
-                      <div
-                        onClick={() => scrollToMessage(msg.reply_id)}
-                        className="border-l-4 border-blue-500 bg-white dark:bg-dark-background-200 dark:border-blue-400 dark:text-white p-1 text-xs cursor-pointer"
-                      >
-                        {msg.reply_message}
-                      </div>
-                    )}
-
-                    {/* Message body / deleted placeholder */}
-                    {msg.is_deleted ? (
-                      <p className="italic text-muted-foreground">Message deleted</p>
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2">
-                          <p>{msg.message}</p>
-                          {msg.edited && (
-                            <span className="text-[10px] text-muted-foreground">(edited)</span>
-                          )}
-                        </div>
-
-                        {/* Actions (only sender) */}
-                        {msg.sender_id === session?.user?.id && !msg.is_deleted && (
-                          <div className="flex gap-2 mt-1">
-                            <button className="text-xs text-blue-600" onClick={() => { startEdit(msg); }}>Edit</button>
-                            <button className="text-xs text-red-600" onClick={() => { setActionModalMessage(msg); setDeleteModalOpen(true); }}>Delete</button>
-                            <button className="text-xs text-gray-600" onClick={() => { setActionModalMessage(msg); setActionModalOpen(true); }}>More</button>
-                          </div>
-                        )}
-                      </>
-                    )}
-
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(msg.created_at).toLocaleTimeString()}
-                    </p>
-                  </div>
-                ))
+        {/* MESSAGE WINDOW - Shown on mobile when viewing message, always shown on desktop */}
+        <div className={`${viewingMessage ? "block" : "hidden"} md:block md:col-span-2`}>
+          <Card className="flex flex-col h-full">
+            <CardHeader className="flex flex-row items-center gap-4 pb-3">
+              {/* Back button - only visible on mobile */}
+              {viewingMessage && (
+                <button
+                  onClick={() => {
+                    setViewingMessage(false);
+                    setSelectedUser(null);
+                    setMessages([]);
+                  }}
+                  className="md:hidden text-2xl hover:bg-gray-100 dark:hover:bg-dark-background-200 rounded p-1"
+                  aria-label="Back to contacts"
+                >
+                  ← 
+                </button>
               )}
-            </div>
+              <CardTitle className="flex-1">
+                {selectedUser
+                  ? `Chat with ${users.find((u) => u.id === selectedUser)?.name}`
+                  : "Select a user"}
+              </CardTitle>
+            </CardHeader>
 
-            {/* REPLY PREVIEW */}
-            {replyTo && (
-              <div className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400 dark:text-white p-2 mt-2 flex justify-between text-sm">
-                <span className="truncate">Replying to: {replyTo.message}</span>
-                <button
-                  onClick={() => setReplyTo(null)}
-                  className="text-red-500"
-                >
-                  ✕
-                </button>
-              </div>
-            )}
+            <CardContent className="flex flex-col flex-1 overflow-hidden">
+              <div
+                ref={chatContainerRef}
+                className="h-72 overflow-y-auto border rounded p-4 space-y-2 flex-1"
+              >
+                {loading ? (
+                  <p>Loading…</p>
+                ) : (
+                  messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      ref={(el) => {
+                        messageRefs.current[msg.id] = el;
+                      }}
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setActionModalMessage(msg);
+                        setActionModalOpen(true);
+                      }}
+                      onClick={() => handleClick(msg)}
+                      onMouseDown={() => handlePressStart(msg)}
+                      onMouseUp={handlePressEnd}
+                      onMouseLeave={handlePressEnd}
+                      onTouchStart={(e) => onTouchStartHandler(msg, e)}
+                      onTouchMove={(e) => onTouchMoveHandler(msg, e)}
+                      onTouchEnd={onTouchEndHandler}
+                      className={`p-2 rounded max-w-xs space-y-1 transition-all break-words ${
+                        msg.sender_id === session?.user?.id
+                          ? "bg-blue-100 text-black dark:bg-blue-900 dark:text-white ml-auto"
+                          : "bg-gray-100 text-black dark:bg-dark-background-100 dark:text-white mr-auto"
+                      }`}
+                    >
+                      {msg.reply_id && (
+                        <div
+                          onClick={() => scrollToMessage(msg.reply_id)}
+                          className="border-l-4 border-blue-500 bg-white dark:bg-dark-background-200 dark:border-blue-400 dark:text-white p-1 text-xs cursor-pointer"
+                        >
+                          {msg.reply_message}
+                        </div>
+                      )}
 
-            {/* EDITING PREVIEW (in input area) */}
-            {editingMessageId && (
-              <div className="border-l-4 border-green-500 bg-green-50 dark:bg-dark-background-200 dark:border-green-400 dark:text-white p-2 mt-2 flex justify-between text-sm items-center">
-                <span className="truncate">Editing message</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={() => { cancelEdit(); }} className="text-sm text-red-500">Cancel</button>
-                </div>
-              </div>
-            )}
+                      {/* Message body / deleted placeholder */}
+                      {msg.is_deleted ? (
+                        <p className="italic text-muted-foreground">Message deleted</p>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <p>{msg.message}</p>
+                            {msg.edited && (
+                              <span className="text-[10px] text-muted-foreground">(edited)</span>
+                            )}
+                          </div>
 
-            {/* INPUT */}
-            <div className="flex gap-2 mt-2 items-end relative">
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setShowEmojiPicker((s) => !s)}
-                  className="text-2xl p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-background-200"
-                >
-                  😊
-                </button>
+                          {/* Actions (only sender) */}
+                          {msg.sender_id === session?.user?.id && !msg.is_deleted && (
+                            <div className="flex gap-2 mt-1">
+                              <button className="text-xs text-blue-600" onClick={() => { startEdit(msg); }}>Edit</button>
+                              <button className="text-xs text-red-600" onClick={() => { setActionModalMessage(msg); setDeleteModalOpen(true); }}>Delete</button>
+                              <button className="text-xs text-gray-600" onClick={() => { setActionModalMessage(msg); setActionModalOpen(true); }}>More</button>
+                            </div>
+                          )}
+                        </>
+                      )}
 
-                {showEmojiPicker && (
-                  <div ref={emojiPickerRef} className="absolute bottom-12 left-0 z-50">
-                    <EmojiPicker onEmojiClick={(e) => handleEmojiClick(e)} />
-                  </div>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(msg.created_at).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  ))
                 )}
               </div>
 
-              <Input
-                ref={inputRef}
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Type a message…"
-                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              />
-              <Button onClick={handleSendMessage}>{editingMessageId ? "Save" : "Send"}</Button>
-            </div>
-          </CardContent>
-        </Card>
+              {/* REPLY PREVIEW */}
+              {replyTo && (
+                <div className="border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900 dark:border-blue-400 dark:text-white p-2 mt-2 flex justify-between text-sm">
+                  <span className="truncate">Replying to: {replyTo.message}</span>
+                  <button
+                    onClick={() => setReplyTo(null)}
+                    className="text-red-500"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+
+              {/* EDITING PREVIEW (in input area) */}
+              {editingMessageId && (
+                <div className="border-l-4 border-green-500 bg-green-50 dark:bg-dark-background-200 dark:border-green-400 dark:text-white p-2 mt-2 flex justify-between text-sm items-center">
+                  <span className="truncate">Editing message</span>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => { cancelEdit(); }} className="text-sm text-red-500">Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {/* INPUT */}
+              <div className="flex gap-2 mt-2 items-end relative">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmojiPicker((s) => !s)}
+                    className="text-2xl p-1 rounded hover:bg-gray-100 dark:hover:bg-dark-background-200"
+                  >
+                    😊
+                  </button>
+
+                  {showEmojiPicker && (
+                    <div ref={emojiPickerRef} className="absolute bottom-12 left-0 z-50">
+                      <EmojiPicker onEmojiClick={(e) => handleEmojiClick(e)} />
+                    </div>
+                  )}
+                </div>
+
+                <Input
+                  ref={inputRef}
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message…"
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                />
+                <Button onClick={handleSendMessage}>{editingMessageId ? "Save" : "Send"}</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Button
@@ -598,12 +647,14 @@ export default function MessagesPage() {
         isOpen={deleteModalOpen}
         onClose={() => setDeleteModalOpen(false)}
         onDeleteForMe={() => {
-          if (actionModalMessage) handleDelete(actionModalMessage, "me");
-          setDeleteModalOpen(false);
+          if (actionModalMessage) {
+            handleDelete(actionModalMessage, "me");
+          }
         }}
         onDeleteForEveryone={() => {
-          if (actionModalMessage) handleDelete(actionModalMessage, "everyone");
-          setDeleteModalOpen(false);
+          if (actionModalMessage) {
+            handleDelete(actionModalMessage, "everyone");
+          }
         }}
       />
     </div>
