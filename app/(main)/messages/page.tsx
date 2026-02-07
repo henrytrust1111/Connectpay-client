@@ -104,6 +104,23 @@ export default function MessagesPage() {
     setShowEmojiPicker(false);
   };
 
+  // Show "scroll to bottom" button when user scrolls up
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+
+  useEffect(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+
+    const onScroll = () => {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      setShowScrollToBottom(distanceFromBottom > 120);
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [messages.length, selectedUser]);
+
   // Close emoji picker when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -348,11 +365,13 @@ export default function MessagesPage() {
       // When opening a chat, jump to the bottom instantly (no visible scrolling)
       scrollToBottom(false);
       isInitialLoadRef.current = false;
+      setShowScrollToBottom(false);
       return;
     }
 
     // For subsequent incoming/sent messages, smooth scroll
     scrollToBottom(true);
+    setShowScrollToBottom(false);
   }, [messages.length]);
 
   /* ---------------- LONG PRESS, CLICK (desktop) & SWIPE (mobile) ---------------- */
@@ -479,7 +498,7 @@ export default function MessagesPage() {
               </CardTitle>
             </CardHeader>
 
-            <CardContent className="flex flex-col flex-1 overflow-hidden">
+            <CardContent className="relative flex flex-col flex-1 overflow-hidden">
               <div
                 ref={chatContainerRef}
                 className="h-72 overflow-y-auto border rounded p-4 space-y-2 flex-1"
@@ -559,6 +578,20 @@ export default function MessagesPage() {
                   ))
                 )}
               </div>
+
+              {/* Scroll-to-bottom button */}
+              {showScrollToBottom && (
+                <button
+                  onClick={() => {
+                    scrollToBottom(true);
+                    setShowScrollToBottom(false);
+                  }}
+                  className="absolute w-10 h-10 right-12 bottom-20 z-40 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-md hover:bg-blue-700 transition-colors"
+                  aria-label="Scroll to latest message"
+                >
+                  ↓
+                </button>
+              )}
 
               {/* REPLY PREVIEW */}
               {replyTo && (
